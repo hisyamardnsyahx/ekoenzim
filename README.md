@@ -1,50 +1,91 @@
-# Welcome to your Expo app 👋
+# Ekoenzim
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplikasi Expo (SDK 54) untuk program pengolahan sampah / eko enzim warga.
 
-## Get started
+## Syarat
 
-1. Install dependencies
+- Node.js 20+ (disarankan 20 LTS atau 22)
+- [pnpm](https://pnpm.io/) atau npm
+- HP dengan **Expo Go** yang mendukung **SDK 54**
+  - Android: unduh Expo Go terbaru dari Play Store
+  - iOS: unduh Expo Go terbaru dari App Store
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Install
 
 ```bash
-npm run reset-project
+pnpm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Proyek memakai `.npmrc` dengan `node-linker=hoisted` agar Metro/Expo Go resolve dependency dengan stabil.
 
-## Learn more
+## Jalankan di Expo Go
 
-To learn more about developing your project with Expo, look at the following resources:
+Error umum **“failed to update remote update”** / gagal scan QR = HP **tidak bisa** jangkau Metro (sering IP salah karena ZeroTier/VPN).
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+1. Pastikan HP dan PC **satu Wi‑Fi**.
+2. **Matikan VPN / ZeroTier** di HP (dan idealnya di PC saat dev).
+3. Di folder proyek:
 
-## Join the community
+```bash
+pnpm start
+```
 
-Join our community of developers creating universal apps.
+`pnpm start` otomatis pilih IP Wi‑Fi `192.168.x.x` (skip ZeroTier `10.x`). Cek log:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```text
+[start-lan] REACT_NATIVE_PACKAGER_HOSTNAME=192.168.100.158
+```
+
+4. QR / URL harus `exp://192.168.…:8081` — **bukan** `exp://10.…`.
+5. Scan QR dengan Expo Go (Android) atau Camera (iOS).
+
+Paksa IP manual (PowerShell), ganti sesuai `ipconfig`:
+
+```powershell
+$env:REACT_NATIVE_PACKAGER_HOSTNAME="192.168.100.158"
+pnpm start:clear
+```
+
+### Jika QR / “failed to update remote update” / “Could not connect”
+
+Coba berurutan:
+
+```bash
+# 1. Cache bersih + IP LAN yang benar
+pnpm start:clear
+
+# 2. Tunnel (HP beda jaringan / firewall / ZeroTier tetap nyala)
+pnpm start:tunnel
+```
+
+Tunnel butuh akun Expo (sekali: `npx expo login`).
+
+### Jika port 8081 sudah dipakai
+
+Tutup proses Expo lama, lalu:
+
+```bash
+pnpm start:clear
+```
+
+### Catatan Windows (path berisi spasi)
+
+Folder `D:\project pkm\ekoenzim` aman, tetapi **hindari spasi** di path bila masih bermasalah (pindah ke `D:\project\ekoenzim`).
+
+## Script
+
+| Script | Fungsi |
+| --- | --- |
+| `pnpm start` | LAN + auto IP Wi‑Fi (bukan ZeroTier) |
+| `pnpm start:clear` | Sama + clear cache Metro |
+| `pnpm start:lan` | Alias `pnpm start` |
+| `pnpm start:tunnel` | Tunnel Expo (lintas jaringan) |
+| `pnpm start:offline` | LAN tanpa cek update Expo remote |
+| `pnpm android` / `pnpm ios` / `pnpm web` | Buka platform terkait |
+| `pnpm lint` | ESLint |
+
+## Struktur
+
+- `app/` — rute expo-router (tabs: Beranda, Kalender, Entry, Monitor)
+- `components/` — UI bersama (kalender, header, card)
+- `constants/` — tema & mock data
