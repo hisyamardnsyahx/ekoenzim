@@ -12,7 +12,8 @@ import { LoadingState } from '@/components/loading-state';
 import { AuthProvider, useAuth } from '@/context/auth-context';
 import { ToastProvider } from '@/context/toast-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { configureNotificationHandler } from '@/lib/reminders';
+import { configureNotificationHandler, showLocalNotification } from '@/lib/reminders';
+import { fetchUnreadChatMessages } from '@/lib/api';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -25,6 +26,38 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { session, profile, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  useEffect(() => {
+    if (!session || profile?.role !== 'admin') return;
+
+    const notifiedIds = new Set();
+
+    const checkNewMessages = async () => {
+      try {
+        const unread = await fetchUnreadChatMessages();
+        if (!unread || unread.length === 0) return;
+
+        for (const msg of unread) {
+          if (!notifiedIds.has(msg.id)) {
+            notifiedIds.add(msg.id);
+            const name = msg.profiles?.nama_lengkap || 'Warga';
+            await showLocalNotification(
+              "Pesan dari " + name,
+              msg.body,
+              { type: 'chat', userId: msg.user_id }
+            );
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to check unread messages:', err);
+      }
+    };
+
+    checkNewMessages();
+    const interval = setInterval(checkNewMessages, 10000);
+
+    return () => clearInterval(interval);
+  }, [session, profile]);
 
   useEffect(() => {
     if (loading) return;

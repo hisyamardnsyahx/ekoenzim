@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "ekoenzim",
+    "name": "E-KOMPAK",
     "slug": "ekoenzim",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "ekoenzim",
+    "scheme": "e-kompak",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -23,7 +23,8 @@
       "permissions": [
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.ekoenzim"
+      "package": "com.ekompak",
+      "usesCleartextTraffic": true
     },
     "web": {
       "output": "static",
@@ -56,6 +57,16 @@
           "color": "#16a34a",
           "defaultChannel": "pengingat"
         }
+      ],
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "shrinkResourcesInReleaseBuilds": true
+          }
+        }
       ]
     ],
     "experiments": {
@@ -66,7 +77,7 @@
       "eas": {
         "projectId": "dcafc94b-16f5-49cc-bd37-55c3e6c12ff3"
       }
-    }
+    },
+    "jsEngine": "hermes"
   }
 }
-

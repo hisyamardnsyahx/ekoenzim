@@ -37,9 +37,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="kalender"
         options={{
-          title: 'Jadwal',
+          title: 'Pengingat',
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="calendar-today" size={size ?? 20} color={color} />
+            <MaterialIcons name="notifications" size={size ?? 20} color={color} />
           ),
         }}
       />

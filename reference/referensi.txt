@@ -1,0 +1,1183 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Home, Calendar, PlusCircle, Activity, BarChart2, BookOpen, MessageCircle, 
+  Users, FileText, LogOut, Camera, Upload, User as UserIcon, Lock, Mail, 
+  MapPin, Phone, Hash, AlertCircle, CheckCircle2, Clock, ChevronDown, ChevronUp, Image as ImageIcon,
+  ArrowLeft, Inbox, RefreshCw, Edit, Trash2, X, Send
+} from 'lucide-react';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line 
+} from 'recharts';
+
+// --- MOCK DATA ---
+const INITIAL_USERS = [
+  { id: 1, name: 'Budi Santoso', phone: '081234567890', role: 'user', status: 'active', location: 'RT 01 / RW 02' },
+  { id: 2, name: 'Siti Aminah', phone: '081298765432', role: 'user', status: 'active', location: 'RT 03 / RW 01' },
+  { id: 3, name: 'Admin Utama', phone: 'admin', role: 'admin', status: 'active', location: 'Kantor Pusat' },
+];
+
+const MOCK_ENTRIES = [
+  { id: 1, userId: 1, date: '2023-10-01', type: 'Ember Tumpuk', startWeight: 5, usage: 2, endWeight: 3, note: 'Sisa sayur' },
+  { id: 2, userId: 1, date: '2023-10-02', type: 'Eko Enzim', startWeight: 2, usage: 0, endWeight: 2, note: 'Kulit buah' },
+  { id: 3, userId: 2, date: '2023-10-02', type: 'Pakan Organik', startWeight: 10, usage: 5, endWeight: 5, note: 'Sisa makanan' },
+];
+
+const MOCK_MONITORING = [
+  { id: 1, userId: 1, date: '2023-10-05', status: 'Proses', desc: 'Fermentasi minggu pertama', img: 'https://images.unsplash.com/photo-1595804369255-b77826a79854?auto=format&fit=crop&q=80&w=200', adminComment: 'Pastikan tutup rapat ya bu, agar tidak kemasukan lalat.' },
+  { id: 2, userId: 2, date: '2023-10-06', status: 'Matang', desc: 'Siap panen, bau segar', img: 'https://images.unsplash.com/photo-1622383563227-04401ab4e5ea?auto=format&fit=crop&q=80&w=200' },
+  { id: 3, userId: 1, date: '2023-10-07', status: 'Perhatian', desc: 'Ada belatung berlebih', img: null },
+];
+
+const MONTHLY_PRODUCTION_MOCK = [
+  { name: 'Jul', ekoEnzim: 12, kompos: 25, pakan: 15, totalSampah: 52 },
+  { name: 'Ags', ekoEnzim: 19, kompos: 30, pakan: 20, totalSampah: 69 },
+  { name: 'Sep', ekoEnzim: 15, kompos: 35, pakan: 22, totalSampah: 72 },
+  { name: 'Okt', ekoEnzim: 22, kompos: 40, pakan: 25, totalSampah: 87 },
+];
+
+// --- UI COMPONENTS (Simulating Shadcn/UI for single-file requirement) ---
+const Card = ({ children, className = '', onClick }) => (
+  <div onClick={onClick} className={`bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden ${onClick ? 'cursor-pointer active:scale-95 transition-transform' : ''} ${className}`}>
+    {children}
+  </div>
+);
+
+const Button = ({ children, variant = 'primary', className = '', type = 'button', onClick, disabled = false }) => {
+  const base = "inline-flex items-center justify-center rounded-xl font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none";
+  const variants = {
+    primary: "bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 shadow-sm",
+    secondary: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+    outline: "border-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50",
+    ghost: "text-gray-600 hover:bg-gray-100",
+    danger: "bg-red-50 text-red-600 hover:bg-red-100"
+  };
+  const sizes = "px-4 py-2.5 text-sm";
+  return (
+    <button type={type} onClick={onClick} disabled={disabled} className={`${base} ${variants[variant]} ${sizes} ${className}`}>
+      {children}
+    </button>
+  );
+};
+
+const Input = ({ label, icon: Icon, error, className = '', ...props }) => (
+  <div className={`space-y-1.5 ${className}`}>
+    {label && <label className="text-sm font-medium text-gray-700">{label}</label>}
+    <div className="relative">
+      {Icon && <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><Icon size={18} /></div>}
+      <input 
+        className={`w-full rounded-xl border ${error ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-500'} bg-gray-50/50 px-4 py-2.5 text-sm transition-all outline-none focus:ring-2 focus:ring-opacity-20 ${Icon ? 'pl-10' : ''}`}
+        {...props}
+      />
+    </div>
+    {error && <p className="text-xs text-red-500">{error}</p>}
+  </div>
+);
+
+const Badge = ({ children, variant = 'default' }) => {
+  const variants = {
+    default: "bg-gray-100 text-gray-700",
+    success: "bg-green-100 text-green-700",
+    warning: "bg-yellow-100 text-yellow-700",
+    danger: "bg-red-100 text-red-700",
+    emerald: "bg-emerald-100 text-emerald-700",
+  };
+  return <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${variants[variant]}`}>{children}</span>;
+};
+
+const Switch = ({ checked, onChange, label, description }) => (
+  <div className="flex items-center justify-between py-3">
+    <div className="space-y-0.5 pr-4">
+      {label && <label className="text-sm font-medium text-gray-900">{label}</label>}
+      {description && <p className="text-xs text-gray-500">{description}</p>}
+    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${checked ? 'bg-emerald-500' : 'bg-gray-200'}`}
+    >
+      <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+    </button>
+  </div>
+);
+
+const ImageWithFallback = ({ src, alt, className = '' }) => {
+  const [error, setError] = useState(false);
+  if (!src || error) {
+    return <div className={`bg-gray-100 flex items-center justify-center text-gray-400 ${className}`}><ImageIcon size={24} /></div>;
+  }
+  return <img src={src} alt={alt} className={`object-cover ${className}`} onError={() => setError(true)} />;
+};
+
+// --- LAYOUT COMPONENTS ---
+const MobileFrame = ({ children }) => (
+  <div className="min-h-screen bg-gray-100 flex justify-center w-full font-sans text-gray-900">
+    <div className="w-full max-w-[420px] bg-gray-50 min-h-screen relative shadow-2xl flex flex-col overflow-hidden">
+      {children}
+    </div>
+  </div>
+);
+
+const BottomNav = ({ activeTab, setTab, role }) => {
+  if (role !== 'user') return null;
+  const navItems = [
+    { id: 'home', icon: Home, label: 'Beranda' },
+    { id: 'calendar', icon: Calendar, label: 'Jadwal' },
+    { id: 'entry', icon: PlusCircle, label: 'Entri' },
+    { id: 'monitor', icon: Activity, label: 'Monitor' },
+  ];
+
+  return (
+    <div className="absolute bottom-0 w-full bg-white border-t border-gray-200 pb-safe z-50">
+      <div className="flex justify-around items-center h-16">
+        {navItems.map((item) => {
+          const isActive = activeTab === item.id;
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setTab(item.id)}
+              className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive ? 'text-emerald-600' : 'text-gray-400 hover:text-emerald-500'}`}
+            >
+              <Icon size={20} className={isActive ? 'stroke-[2.5px]' : ''} />
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const AdminNav = ({ activeTab, setTab }) => {
+  const navItems = [
+    { id: 'dashboard', icon: BarChart2, label: 'Dashboard' },
+    { id: 'reports', icon: FileText, label: 'Laporan' },
+    { id: 'users', icon: Users, label: 'Pengguna' },
+  ];
+
+  return (
+    <div className="absolute bottom-0 w-full bg-white border-t border-slate-200 pb-safe z-50">
+      <div className="flex justify-around items-center h-16">
+        {navItems.map((item) => {
+          const isActive = activeTab === item.id;
+          const Icon = item.icon;
+          return (
+             <button
+              key={item.id}
+              onClick={() => setTab(item.id)}
+              className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive ? 'text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Icon size={20} className={isActive ? 'stroke-[2.5px]' : ''} />
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// --- AUTH SCREENS ---
+const RegisterScreen = ({ onRegister, onNavigate }) => {
+  const [formData, setFormData] = useState({ name: '', phone: '', password: '', address: '', age: '' });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onRegister({ 
+      id: Date.now(), 
+      ...formData, 
+      role: 'user', 
+      status: 'active', 
+      location: formData.address 
+    });
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-white">
+      <div className="px-4 py-4 flex items-center shrink-0">
+         <button onClick={() => onNavigate('login')} type="button" className="p-2 -ml-2 text-gray-500 hover:text-gray-800 transition-colors">
+           <ArrowLeft size={20} />
+         </button>
+         <h1 className="text-lg font-bold ml-2 text-gray-900">Daftar Akun</h1>
+      </div>
+      <div className="flex-1 overflow-y-auto px-6 pb-12 pt-2">
+         <form onSubmit={handleSubmit} className="space-y-4">
+            <Input label="Nama Lengkap" placeholder="Masukkan nama Anda" required
+              value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+            <Input label="No. Handphone / Email" icon={Phone} placeholder="0812..." required
+              value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+            <Input label="Kata Sandi" icon={Lock} type="password" placeholder="••••••••" required
+              value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+            <Input label="Alamat / RT RW" icon={MapPin} placeholder="Contoh: RT 01 / RW 02" required
+              value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} />
+            <Input label="Umur (Tahun)" type="number" placeholder="Contoh: 35" required
+              value={formData.age} onChange={(e) => setFormData({...formData, age: e.target.value})} />
+            
+            <Button type="submit" className="w-full mt-8 py-3 text-base">Daftar Sekarang</Button>
+         </form>
+      </div>
+    </div>
+  );
+};
+
+const HomeScreen = ({ user, setScreen }) => {
+  return (
+    <div className="flex flex-col h-full bg-gray-50 pb-20 overflow-y-auto no-scrollbar">
+      {/* Header Profile */}
+      <div className="bg-emerald-600 px-5 pt-8 pb-6 text-white rounded-b-3xl shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <p className="text-emerald-100 text-sm">Selamat Datang,</p>
+            <h1 className="text-xl font-bold">{user?.name || 'Warga'}</h1>
+          </div>
+          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm shadow-inner">
+            <UserIcon size={24} className="text-white" />
+          </div>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-6 -mt-6 relative z-10">
+        {/* Banner Info */}
+        <Card className="p-4 shadow-md border-none flex items-center gap-4 bg-white">
+          <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-gray-100">
+            <ImageWithFallback src="https://images.unsplash.com/photo-1595804369255-b77826a79854?auto=format&fit=crop&q=80&w=200" className="w-full h-full" />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-800 leading-tight">Program EkoCycle</h3>
+            <p className="text-xs text-gray-500 flex items-center gap-1 mt-1 font-medium"><MapPin size={12}/> {user?.location || 'Lokasi Mitra'}</p>
+          </div>
+        </Card>
+
+        {/* Quick Actions (Shortcut to Tutorial & CS) */}
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => setScreen('tutorial')} className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3 active:scale-95 transition-transform text-left hover:border-emerald-200">
+            <div className="bg-emerald-50 p-2.5 rounded-xl text-emerald-600"><BookOpen size={20}/></div>
+            <span className="text-sm font-semibold text-gray-700">Pedoman</span>
+          </button>
+          <button onClick={() => setScreen('cs')} className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3 active:scale-95 transition-transform text-left hover:border-blue-200">
+            <div className="bg-blue-50 p-2.5 rounded-xl text-blue-600"><MessageCircle size={20}/></div>
+            <span className="text-sm font-semibold text-gray-700">Bantuan</span>
+          </button>
+        </div>
+
+        {/* Stats Summary */}
+        <div>
+          <h3 className="font-semibold text-gray-800 mb-3 px-1 text-sm">Ringkasan Bulan Ini</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: 'Eko Enzim', val: '12 L', icon: Activity, color: 'text-blue-500', bg: 'bg-blue-50' },
+              { label: 'Kompos', val: '25 Kg', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+              { label: 'Pakan', val: '15 Kg', icon: Hash, color: 'text-amber-500', bg: 'bg-amber-50' },
+              { label: 'Total Sampah', val: '52 Kg', icon: BarChart2, color: 'text-purple-500', bg: 'bg-purple-50' },
+            ].map((stat, i) => (
+              <Card key={i} className="p-3 border-none shadow-sm flex flex-col items-center text-center">
+                <div className={`${stat.bg} ${stat.color} p-2 rounded-full mb-2`}>
+                  <stat.icon size={18} />
+                </div>
+                <p className="text-lg font-bold text-gray-800">{stat.val}</p>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">{stat.label}</p>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Production Chart Integration */}
+        <Card className="p-5 shadow-sm border-none bg-white">
+           <h3 className="font-semibold text-gray-800 mb-4 text-sm">Grafik Pengolahan</h3>
+           <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={MONTHLY_PRODUCTION_MOCK} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                  <Tooltip cursor={{fill: '#f9fafb'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Bar dataKey="totalSampah" fill="#10B981" radius={[4, 4, 0, 0]} name="Sampah (Kg)" />
+                </BarChart>
+              </ResponsiveContainer>
+           </div>
+        </Card>
+      </div>
+
+      {/* Floating Chat Bubble untuk Bantuan (Customer Service) */}
+      <button 
+        onClick={() => setScreen('cs')}
+        className="fixed bottom-20 right-5 z-40 bg-emerald-600 text-white p-3.5 rounded-full shadow-xl hover:bg-emerald-700 active:scale-95 transition-all border-2 border-white"
+      >
+        <MessageCircle size={24} />
+        <span className="absolute -top-1 -right-1 flex h-4 w-4">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border-2 border-white"></span>
+        </span>
+      </button>
+    </div>
+  )
+}
+
+const LoginScreen = ({ onLogin, onNavigate }) => {
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [captchaCode, setCaptchaCode] = useState('');
+  const [captchaInput, setCaptchaInput] = useState('');
+
+  useEffect(() => {
+    generateCaptcha();
+  }, []);
+
+  const generateCaptcha = () => {
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    setCaptchaCode(code);
+    setCaptchaInput('');
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError('');
+    
+    if (phone === 'admin') {
+       onLogin({ id: 3, name: 'Admin Utama', role: 'admin' });
+       return;
+    }
+    
+    if (captchaInput !== captchaCode) {
+       setError('Kode keamanan (Captcha) salah. Silakan coba lagi.');
+       generateCaptcha(); // Acak ulang jika salah
+       return;
+    }
+
+    onLogin({ id: 1, name: 'Budi Santoso', role: 'user', phone }); // Mock user login
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-white">
+      <div className="flex-1 overflow-y-auto px-6 py-12 flex flex-col justify-center">
+        <div className="text-center mb-8">
+          <div className="mx-auto w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4 shadow-inner">
+            <Activity size={32} />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">EkoCycle</h1>
+          <p className="text-sm text-gray-500 mt-1">Sistem Pengolahan Sampah Organik</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input 
+            icon={Phone} label="No. Handphone / Email" placeholder="Contoh: 0812..." 
+            value={phone} onChange={(e) => setPhone(e.target.value)} required
+          />
+          <Input 
+            icon={Lock} label="Kata Sandi" type="password" placeholder="••••••••" 
+            value={password} onChange={(e) => setPassword(e.target.value)} required
+          />
+
+          {/* Captcha Section */}
+          <div className="space-y-1.5 pt-1">
+            <label className="text-sm font-medium text-gray-700">Verifikasi Keamanan</label>
+            <div className="flex gap-2">
+              <div className="flex-1 bg-gray-100 rounded-xl flex items-center justify-center tracking-[0.3em] font-mono font-bold text-xl text-gray-700 relative overflow-hidden select-none border border-gray-200">
+                {/* Efek noise buatan untuk Captcha */}
+                <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '6px 6px' }}></div>
+                <span className="relative z-10 blur-[0.5px] skew-x-[-10deg]">{captchaCode}</span>
+              </div>
+              <button 
+                type="button" 
+                onClick={generateCaptcha} 
+                className="px-3 py-2 text-gray-500 hover:text-emerald-600 bg-gray-50 rounded-xl border border-gray-200 transition-colors" 
+                title="Muat ulang Captcha"
+              >
+                <RefreshCw size={18} />
+              </button>
+              <input
+                type="text"
+                maxLength={4}
+                className="w-24 rounded-xl border border-gray-200 bg-gray-50/50 px-0 py-2 text-center text-base font-mono focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-all"
+                placeholder="Ketikan"
+                value={captchaInput}
+                onChange={(e) => setCaptchaInput(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          {error && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl flex items-start gap-2">
+            <AlertCircle size={16} className="mt-0.5 shrink-0" /> <p>{error}</p>
+          </div>}
+
+          <Button type="submit" className="w-full mt-6 py-3 text-base">Masuk</Button>
+        </form>
+
+        <div className="mt-8 text-center space-y-4">
+          <p className="text-sm text-gray-500">
+            Belum punya akun? <button onClick={() => onNavigate('register')} className="text-emerald-600 font-semibold hover:underline">Daftar sekarang</button>
+          </p>
+          <div className="pt-4 border-t border-gray-100">
+             <button onClick={() => setPhone('admin')} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+               Isi otomatis sebagai Admin (Demo)
+             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CalendarScreen = () => {
+  const [alarms, setAlarms] = useState({
+    penggiat: true,
+    lindi: true,
+    monitoring: true,
+    timbang: false,
+  });
+
+  const toggleAlarm = (key) => setAlarms(prev => ({...prev, [key]: !prev[key]}));
+
+  return (
+    <div className="flex flex-col h-full bg-gray-50 pb-20">
+      <div className="bg-white px-5 py-4 border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <h1 className="text-xl font-bold text-gray-900">Jadwal & Pengingat</h1>
+      </div>
+      <div className="p-5 space-y-4">
+        <Card className="p-1 divide-y divide-gray-100">
+           <div className="px-4 py-1">
+             <Switch 
+               checked={alarms.penggiat} 
+               onChange={() => toggleAlarm('penggiat')}
+               label="Panen Kompos"
+               description="Setiap 3 bulan sekali"
+             />
+           </div>
+           <div className="px-4 py-1">
+             <Switch 
+               checked={alarms.lindi} 
+               onChange={() => toggleAlarm('lindi')}
+               label="Pengambilan Air Lindi"
+               description="Setiap 3 hari sekali"
+             />
+           </div>
+           <div className="px-4 py-1">
+             <Switch 
+               checked={alarms.monitoring} 
+               onChange={() => toggleAlarm('monitoring')}
+               label="Monitoring Kondisi"
+               description="Seminggu sekali (1x)"
+             />
+           </div>
+           <div className="px-4 py-1">
+             <Switch 
+               checked={alarms.timbang} 
+               onChange={() => toggleAlarm('timbang')}
+               label="Penimbangan Sampah"
+               description="Setiap hari"
+             />
+           </div>
+        </Card>
+        
+        <div className="bg-blue-50 text-blue-700 p-4 rounded-xl text-sm flex gap-3 mt-4 border border-blue-100">
+           <AlertCircle size={20} className="shrink-0 mt-0.5" />
+           <p>Aktifkan pengingat untuk mendapatkan notifikasi (simulasi) pada perangkat Anda sesuai jadwal yang ditentukan.</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EntryDataScreen = ({ entries, addEntry }) => {
+  const [type, setType] = useState('Ember Tumpuk');
+  const [awal, setAwal] = useState('');
+  const [pakai, setPakai] = useState('');
+  const [showToast, setShowToast] = useState(false);
+  
+  // Auto calculate
+  const sisa = useMemo(() => {
+    const wAwal = parseFloat(awal) || 0;
+    const wPakai = parseFloat(pakai) || 0;
+    return wAwal - wPakai;
+  }, [awal, pakai]);
+
+  const isInvalid = sisa < 0 || !awal;
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (isInvalid) return;
+    addEntry({
+      id: Date.now(), date: new Date().toISOString().split('T')[0],
+      type, startWeight: parseFloat(awal), usage: parseFloat(pakai)||0, endWeight: sisa, note: ''
+    });
+    setAwal(''); setPakai('');
+    
+    // Tampilkan Toast
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  const getSisaStyle = () => {
+    if (!awal && !pakai) return 'bg-gray-50 border-gray-200 text-gray-500';
+    if (sisa < 0) return 'bg-red-50 border-red-200 text-red-600';
+    if (sisa === 0) return 'bg-blue-50 border-blue-200 text-blue-600';
+    return 'bg-emerald-50 border-emerald-200 text-emerald-600';
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-gray-50 pb-20 relative">
+      {/* Toast Notification */}
+      <div className={`absolute top-20 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full shadow-lg z-50 flex items-center gap-2 text-sm transition-all duration-300 ${showToast ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
+        <CheckCircle2 size={16} className="text-emerald-400" /> Data berhasil disimpan!
+      </div>
+
+      <div className="bg-white px-5 py-4 border-b border-gray-200 sticky top-0 z-10">
+        <h1 className="text-xl font-bold text-gray-900">Entri Data Harian</h1>
+      </div>
+      <div className="p-5 overflow-y-auto">
+        <Card className="p-5 mb-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700">Jenis Olahan</label>
+              <select 
+                className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm focus:border-emerald-500 focus:ring-emerald-500 outline-none"
+                value={type} onChange={(e) => setType(e.target.value)}
+              >
+                <option>Ember Tumpuk</option>
+                <option>Eko Enzim</option>
+                <option>Pakan Organik</option>
+              </select>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Berat Awal (kg)" type="number" step="0.1" placeholder="0.0" value={awal} onChange={(e)=>setAwal(e.target.value)} required />
+              <Input label="Penggunaan (kg)" type="number" step="0.1" placeholder="0.0" value={pakai} onChange={(e)=>setPakai(e.target.value)} />
+            </div>
+
+            <div className={`p-4 rounded-xl flex justify-between items-center border transition-colors ${getSisaStyle()}`}>
+              <span className="text-sm font-medium opacity-80">Sisa / Berat Akhir:</span>
+              <span className="text-xl font-bold">{sisa.toFixed(1)} kg</span>
+            </div>
+            
+            {sisa < 0 && <p className="text-xs text-red-500 font-medium">Nilai penggunaan tidak boleh melebihi berat awal.</p>}
+
+            <Button type="submit" disabled={isInvalid} className="w-full">Simpan Data</Button>
+          </form>
+        </Card>
+
+        <h3 className="font-semibold text-gray-800 px-1 mb-3">Riwayat Terakhir</h3>
+        <div className="space-y-3">
+          {entries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center bg-white rounded-2xl border border-gray-100 border-dashed">
+              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 mb-3"><Inbox size={24}/></div>
+              <p className="text-sm font-medium text-gray-800">Belum ada riwayat entri</p>
+              <p className="text-xs text-gray-500 mt-1">Mulai catat pengolahan pertamamu hari ini.</p>
+            </div>
+          ) : (
+            entries.slice(-3).reverse().map(entry => (
+              <Card key={entry.id} className="p-4 flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-bold text-gray-800">{entry.type}</p>
+                  <p className="text-xs text-gray-500 flex items-center gap-1 mt-1 font-medium"><Clock size={12}/> {entry.date}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-gray-900 mb-1">{entry.startWeight} kg</p>
+                  <Badge variant={entry.endWeight > 0 ? "emerald" : "default"}>Sisa {entry.endWeight} kg</Badge>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MonitoringScreen = ({ monitoringLogs, addLog }) => {
+  const [desc, setDesc] = useState('');
+  const [status, setStatus] = useState('Proses');
+  const [hasImage, setHasImage] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!desc) return;
+    addLog({
+      id: Date.now(), date: new Date().toISOString().split('T')[0],
+      status, desc, img: hasImage ? 'https://images.unsplash.com/photo-1595804369255-b77826a79854?auto=format&fit=crop&q=80&w=200' : null
+    });
+    setDesc(''); setHasImage(false); setStatus('Proses');
+    
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  const getStatusChipStyle = (s, isActive) => {
+    if (!isActive) return 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50';
+    if (s === 'Proses') return 'bg-blue-50 text-blue-700 border-blue-500 ring-1 ring-blue-500 shadow-sm';
+    if (s === 'Matang') return 'bg-emerald-50 text-emerald-700 border-emerald-500 ring-1 ring-emerald-500 shadow-sm';
+    if (s === 'Perhatian') return 'bg-orange-50 text-orange-700 border-orange-500 ring-1 ring-orange-500 shadow-sm';
+    return '';
+  };
+
+  const getStatusBadgeVariant = (s) => {
+    if (s === 'Matang') return 'success';
+    if (s === 'Perhatian') return 'warning';
+    return 'default'; // Proses uses default gray/blue-ish
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-gray-50 pb-20 relative">
+      {/* Toast Notification */}
+      <div className={`absolute top-20 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full shadow-lg z-50 flex items-center gap-2 text-sm transition-all duration-300 ${showToast ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
+        <CheckCircle2 size={16} className="text-emerald-400" /> Laporan terkirim!
+      </div>
+
+      <div className="bg-white px-5 py-4 border-b border-gray-200 sticky top-0 z-10">
+        <h1 className="text-xl font-bold text-gray-900">Monitoring Kondisi</h1>
+      </div>
+      <div className="p-5 overflow-y-auto">
+        <Card className="p-5 mb-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+             <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700">Foto Kondisi</label>
+              <div 
+                onClick={() => setHasImage(!hasImage)}
+                className={`w-full h-32 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors ${hasImage ? 'border-emerald-500 bg-emerald-50 text-emerald-600' : 'border-gray-300 bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+              >
+                {hasImage ? (
+                  <>
+                    <CheckCircle2 size={24} className="mb-2" />
+                    <span className="text-sm font-medium">Foto dilampirkan (Mock)</span>
+                  </>
+                ) : (
+                  <>
+                    <Camera size={24} className="mb-2" />
+                    <span className="text-sm">Ketuk untuk Ambil/Pilih Foto</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Status Kondisi</label>
+              <div className="flex gap-2">
+                {['Proses', 'Matang', 'Perhatian'].map(s => (
+                  <button 
+                    key={s} type="button" onClick={() => setStatus(s)}
+                    className={`flex-1 py-2 text-xs font-semibold rounded-full border transition-all ${getStatusChipStyle(s, status === s)}`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5 pt-2">
+              <label className="text-sm font-medium text-gray-700">Deskripsi / Catatan</label>
+              <textarea 
+                className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm focus:border-emerald-500 focus:ring-emerald-500 outline-none resize-none"
+                rows="3" placeholder="Contoh: Bau agak asam, warna mulai kecoklatan..."
+                value={desc} onChange={(e) => setDesc(e.target.value)} required
+              ></textarea>
+            </div>
+            
+            <Button type="submit" disabled={!desc} className="w-full">Kirim Laporan</Button>
+          </form>
+        </Card>
+
+        <h3 className="font-semibold text-gray-800 px-1 mb-3">Laporan Anda</h3>
+        <div className="space-y-3">
+          {monitoringLogs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center bg-white rounded-2xl border border-gray-100 border-dashed">
+              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 mb-3"><Inbox size={24}/></div>
+              <p className="text-sm font-medium text-gray-800">Belum ada laporan monitoring</p>
+              <p className="text-xs text-gray-500 mt-1">Upload foto kondisimu secara rutin di sini.</p>
+            </div>
+          ) : (
+            monitoringLogs.slice().reverse().map(log => (
+              <Card key={log.id} className="p-4 flex gap-4">
+                <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                  {log.img ? <ImageWithFallback src={log.img} className="w-full h-full" /> : <div className="w-full h-full flex items-center justify-center text-gray-400"><ImageIcon size={20}/></div>}
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-1">
+                    <Badge variant={getStatusBadgeVariant(log.status)}>{log.status}</Badge>
+                    <span className="text-[10px] font-medium text-gray-400">{log.date}</span>
+                  </div>
+                  <p className="text-sm text-gray-700 line-clamp-2 font-medium">{log.desc}</p>
+                  
+                  {/* Tampilkan Komentar Admin jika ada */}
+                  {log.adminComment && (
+                    <div className="mt-2 bg-emerald-50 border border-emerald-100 p-2 rounded-lg text-xs flex gap-2 items-start shadow-sm">
+                      <MessageCircle size={14} className="shrink-0 mt-0.5 text-emerald-600" />
+                      <div>
+                        <span className="font-bold text-emerald-800 block mb-0.5">Balasan Admin:</span>
+                        <p className="text-emerald-700">{log.adminComment}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AdminReports = ({ logs, addLogComment }) => {
+  const [filter, setFilter] = useState('Semua');
+  const filters = ['Semua', 'Matang', 'Proses', 'Perhatian'];
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [replyText, setReplyText] = useState('');
+
+  const filteredLogs = filter === 'Semua' ? logs : logs.filter(l => l.status === filter);
+
+  const handleSendReply = (logId) => {
+    if (!replyText.trim()) return;
+    addLogComment(logId, replyText);
+    setReplyingTo(null);
+    setReplyText('');
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50 pb-20">
+      <div className="bg-white px-5 py-4 border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+        <h1 className="text-xl font-bold text-slate-800">Laporan Monitoring</h1>
+      </div>
+      
+      <div className="px-5 pt-4 pb-3 overflow-x-auto no-scrollbar flex gap-2 sticky top-[60px] bg-slate-50 z-10">
+        {filters.map(f => (
+          <button 
+            key={f} onClick={() => setFilter(f)}
+            className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors font-medium ${filter === f ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      <div className="p-5 pt-2 space-y-3">
+        {filteredLogs.slice().reverse().map(log => {
+           let variant = 'default';
+           if(log.status === 'Matang') variant = 'success';
+           if(log.status === 'Perhatian') variant = 'warning';
+
+           return (
+            <Card key={log.id} className="p-3 border-slate-200 flex gap-3 hover:border-slate-300 transition-colors">
+              <div className="w-16 h-16 shrink-0 rounded-lg bg-slate-100 overflow-hidden shadow-inner">
+                {log.img ? <ImageWithFallback src={log.img} className="w-full h-full" /> : <div className="w-full h-full flex justify-center items-center text-slate-400"><ImageIcon size={20}/></div>}
+              </div>
+              
+              <div className="flex-1 min-w-0 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start mb-0.5">
+                    <p className="font-bold text-sm text-slate-800 truncate">ID Mitra: {log.userId}</p>
+                    <span className="text-[10px] font-medium text-slate-400">{log.date}</span>
+                  </div>
+                  <p className="text-xs text-slate-600 line-clamp-1 mb-2">{log.desc}</p>
+                </div>
+                
+                <div className="flex justify-between items-center mb-2">
+                  <Badge variant={variant}>{log.status}</Badge>
+                </div>
+
+                {/* Bagian Komentar Admin */}
+                <div className="border-t border-slate-100 pt-2 mt-auto">
+                  {log.adminComment ? (
+                    <div className="bg-emerald-50 p-2 rounded-lg text-[11px] text-emerald-800 border border-emerald-100">
+                      <span className="font-bold">Dibalas: </span>{log.adminComment}
+                    </div>
+                  ) : replyingTo === log.id ? (
+                    <div className="flex gap-1 items-center">
+                      <input 
+                        type="text" 
+                        value={replyText} 
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="Ketik balasan..." 
+                        className="flex-1 text-[11px] border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500"
+                        autoFocus
+                      />
+                      <button onClick={() => handleSendReply(log.id)} className="bg-indigo-600 text-white p-1 rounded-md hover:bg-indigo-700">
+                        <Send size={12} />
+                      </button>
+                      <button onClick={() => {setReplyingTo(null); setReplyText('');}} className="bg-slate-200 text-slate-600 p-1 rounded-md hover:bg-slate-300">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => setReplyingTo(log.id)} 
+                      className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                    >
+                      <MessageCircle size={12} /> Beri Komentar
+                    </button>
+                  )}
+                </div>
+              </div>
+            </Card>
+          )
+        })}
+        {filteredLogs.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+             <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-400 mb-3"><Inbox size={24}/></div>
+             <p className="text-slate-500 font-medium">Tidak ada laporan untuk filter ini.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AdminUsers = ({ users, toggleUserStatus, addUser, updateUser, deleteUser }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState('add'); // 'add' | 'edit'
+  const [formData, setFormData] = useState({ id: null, name: '', phone: '', location: '' });
+
+  const openModal = (mode, user = null) => {
+    setModalMode(mode);
+    if (user) {
+      setFormData(user);
+    } else {
+      setFormData({ id: null, name: '', phone: '', location: '' });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (modalMode === 'add') {
+      addUser(formData);
+    } else {
+      updateUser(formData.id, formData);
+    }
+    setIsModalOpen(false);
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm("Apakah Anda yakin ingin menghapus mitra ini secara permanen?")) {
+      deleteUser(id);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50 pb-20 relative">
+      <div className="bg-white px-5 py-4 border-b border-slate-200 sticky top-0 z-10 flex justify-between items-center shadow-sm">
+        <h1 className="text-xl font-bold text-slate-800">Manajemen Mitra</h1>
+        <button onClick={() => openModal('add')} className="bg-slate-800 text-white p-2 rounded-full hover:bg-slate-900 transition-colors shadow-sm">
+          <PlusCircle size={20} />
+        </button>
+      </div>
+      <div className="p-5 space-y-3">
+        {users.filter(u => u.role !== 'admin').map(u => (
+          <Card key={u.id} className="p-4 border-slate-100">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-bold text-slate-800">{u.name}</h3>
+              <Badge variant={u.status === 'active' ? 'success' : 'danger'}>
+                {u.status === 'active' ? 'Aktif' : 'Nonaktif'}
+              </Badge>
+            </div>
+            <div className="text-sm text-slate-600 space-y-1 mb-4">
+              <p className="flex items-center gap-2"><Phone size={14}/> {u.phone}</p>
+              <p className="flex items-center gap-2"><MapPin size={14}/> {u.location || 'Belum diatur'}</p>
+            </div>
+            <div className="flex justify-between items-center border-t border-slate-100 pt-3">
+               <div className="flex gap-2">
+                 <button onClick={() => openModal('edit', u)} className="p-1.5 text-slate-500 bg-slate-100 rounded-md hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+                   <Edit size={16} />
+                 </button>
+                 <button onClick={() => handleDelete(u.id)} className="p-1.5 text-slate-500 bg-slate-100 rounded-md hover:bg-red-50 hover:text-red-600 transition-colors">
+                   <Trash2 size={16} />
+                 </button>
+               </div>
+               <Button 
+                variant={u.status === 'active' ? 'outline' : 'primary'} 
+                className={`!py-1.5 !px-3 !text-xs ${u.status === 'active' ? '!border-red-200 !text-red-600 hover:!bg-red-50' : '!bg-slate-800'}`}
+                onClick={() => toggleUserStatus(u.id)}
+               >
+                 {u.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
+               </Button>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Modal Tambah/Edit Mitra */}
+      {isModalOpen && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-full">
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+              <h2 className="font-bold text-slate-800">{modalMode === 'add' ? 'Tambah Mitra Baru' : 'Edit Data Mitra'}</h2>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto">
+              <Input 
+                label="Nama Lengkap" placeholder="Masukkan nama" required 
+                value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})}
+              />
+              <Input 
+                label="No. Handphone" placeholder="0812..." required icon={Phone}
+                value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})}
+              />
+              <Input 
+                label="Lokasi / RT RW" placeholder="RT 01 / RW 02" required icon={MapPin}
+                value={formData.location} onChange={(e) => setFormData({...formData, location: e.target.value})}
+              />
+              <Button type="submit" className="w-full !mt-6 !bg-slate-800 hover:!bg-slate-900">
+                {modalMode === 'add' ? 'Simpan Mitra' : 'Perbarui Data'}
+              </Button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const AdminDashboard = () => {
+  return (
+    <div className="flex flex-col h-full bg-slate-50 pb-20 overflow-y-auto no-scrollbar">
+      <div className="bg-slate-800 px-5 pt-8 pb-6 text-white rounded-b-3xl shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <p className="text-slate-300 text-sm">Dashboard</p>
+            <h1 className="text-xl font-bold">Admin EkoCycle</h1>
+          </div>
+          <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm shadow-inner">
+            <BarChart2 size={24} className="text-white" />
+          </div>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-6 -mt-6 relative z-10">
+        <div className="grid grid-cols-2 gap-3">
+          <Card className="p-4 shadow-sm border-none bg-white flex flex-col items-center text-center">
+            <div className="bg-blue-50 text-blue-600 p-2 rounded-full mb-2"><Users size={20} /></div>
+            <p className="text-2xl font-bold text-slate-800">24</p>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Mitra Aktif</p>
+          </Card>
+          <Card className="p-4 shadow-sm border-none bg-white flex flex-col items-center text-center">
+            <div className="bg-emerald-50 text-emerald-600 p-2 rounded-full mb-2"><Activity size={20} /></div>
+            <p className="text-2xl font-bold text-slate-800">450 Kg</p>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Sampah Terolah</p>
+          </Card>
+        </div>
+
+        <Card className="p-5 shadow-sm border-none bg-white">
+           <h3 className="font-semibold text-slate-800 mb-4 text-sm">Grafik Total Sampah Terolah</h3>
+           <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={MONTHLY_PRODUCTION_MOCK} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Bar dataKey="totalSampah" fill="#1e293b" radius={[4, 4, 0, 0]} name="Sampah (Kg)" />
+                </BarChart>
+              </ResponsiveContainer>
+           </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+const TutorialScreen = ({ onBack }) => {
+  return (
+    <div className="flex flex-col h-full bg-white pb-20">
+      <div className="px-4 py-4 flex items-center border-b border-gray-100 shrink-0 sticky top-0 bg-white z-10">
+        <button onClick={onBack} className="p-2 -ml-2 text-gray-500 hover:text-gray-800 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="text-lg font-bold ml-2 text-gray-900">Buku Pedoman</h1>
+      </div>
+      <div className="p-5 overflow-y-auto space-y-4">
+        <Card className="p-4 border-emerald-100 bg-emerald-50/30">
+          <h3 className="font-bold text-emerald-800 flex items-center gap-2 mb-3"><BookOpen size={18}/> Ember Tumpuk</h3>
+          <div className="text-sm text-gray-700 space-y-2">
+            <p><strong>1. Persiapan:</strong> Siapkan dua ember, atas berlubang, bawah utuh untuk menampung lindi.</p>
+            <p><strong>2. Proses:</strong> Masukkan sampah organik (sisa sayur, buah) ke ember atas.</p>
+            <p><strong>3. Fermentasi:</strong> Semprot cairan bioaktivator/EM4 secukupnya.</p>
+            <p><strong>4. Panen:</strong> Tutup rapat. Panen air lindi dari ember bawah lewat keran.</p>
+          </div>
+        </Card>
+        <Card className="p-4 border-blue-100 bg-blue-50/30">
+          <h3 className="font-bold text-blue-800 flex items-center gap-2 mb-3"><Activity size={18}/> Eko Enzim</h3>
+          <div className="text-sm text-gray-700 space-y-2">
+            <p><strong>1. Rasio:</strong> 1 (Gula/Molase) : 3 (Sampah buah/sayur) : 10 (Air).</p>
+            <p><strong>2. Wadah:</strong> Campur dalam wadah plastik yang bisa mengembang (jangan kaca).</p>
+            <p><strong>3. Perawatan:</strong> Buka tutup secara berkala di minggu pertama untuk membuang gas.</p>
+            <p><strong>4. Panen:</strong> Saring dan panen cairan setelah minimal 3 bulan fermentasi.</p>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+const CustomerServiceScreen = ({ onBack }) => {
+  const [msg, setMsg] = useState('');
+  const [chat, setChat] = useState([
+    { id: 1, text: 'Halo Bapak/Ibu! Ada yang bisa kami bantu seputar pengolahan sampah EkoCycle hari ini?', sender: 'admin', time: '09:00' }
+  ]);
+
+  const sendMsg = (e) => {
+    e.preventDefault();
+    if(!msg.trim()) return;
+    
+    const newChat = { id: Date.now(), text: msg, sender: 'user', time: 'Baru saja' };
+    setChat([...chat, newChat]);
+    setMsg('');
+    
+    // Auto reply mock
+    setTimeout(() => {
+      setChat(prev => [...prev, { id: Date.now(), text: 'Terima kasih atas pesannya. Tim EkoCycle akan segera membalas pertanyaan Anda secepatnya.', sender: 'admin', time: 'Baru saja' }]);
+    }, 1500);
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-gray-50 relative">
+      <div className="bg-emerald-600 px-4 py-4 flex items-center text-white shrink-0 shadow-sm z-10">
+        <button onClick={onBack} className="p-2 -ml-2 text-emerald-100 hover:text-white transition-colors">
+          <ArrowLeft size={20} />
+        </button>
+        <div className="ml-2 flex items-center gap-3">
+          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+            <Activity size={20} />
+          </div>
+          <div>
+            <h1 className="text-base font-bold leading-tight">Admin EkoCycle</h1>
+            <p className="text-xs text-emerald-200 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-300"></span> Online</p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
+        {chat.map(c => (
+          <div key={c.id} className={`flex ${c.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm ${c.sender === 'user' ? 'bg-emerald-600 text-white rounded-tr-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm'}`}>
+              <p>{c.text}</p>
+              <span className={`text-[10px] block mt-1.5 ${c.sender === 'user' ? 'text-emerald-200 text-right' : 'text-gray-400'}`}>{c.time}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="absolute bottom-0 w-full bg-white border-t border-gray-200 p-3 pb-safe">
+        <form onSubmit={sendMsg} className="flex gap-2 items-center">
+          <input 
+            type="text" 
+            value={msg} onChange={e => setMsg(e.target.value)}
+            placeholder="Ketik pesan Anda di sini..." 
+            className="flex-1 bg-gray-100 rounded-full px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all border border-transparent focus:border-emerald-300"
+          />
+          <button type="submit" disabled={!msg.trim()} className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shrink-0 hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-sm">
+            <Send size={16} className="-ml-0.5" />
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// --- MAIN APP COMPONENT ---
+export default function App() {
+  // Auth & Global State
+  const [user, setUser] = useState(null); // null = guest, {...} = logged in
+  const [activeTab, setActiveTab] = useState('home'); // for bottom nav (user) or admin nav
+  const [currentScreen, setCurrentScreen] = useState('login'); // login, register, app, tutorial, cs
+  
+  // Mock Data States
+  const [users, setUsers] = useState(INITIAL_USERS);
+  const [entries, setEntries] = useState(MOCK_ENTRIES);
+  const [logs, setLogs] = useState(MOCK_MONITORING);
+
+  // Handlers
+  const handleLogin = (userData) => {
+    setUser(userData);
+    setCurrentScreen('app');
+    setActiveTab(userData.role === 'admin' ? 'dashboard' : 'home');
+  };
+
+  const handleRegister = (newUserData) => {
+    setUsers([...users, newUserData]);
+    handleLogin(newUserData);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setCurrentScreen('login');
+  };
+
+  const addEntry = (entry) => setEntries([...entries, entry]);
+  const addLog = (log) => setLogs([...logs, log]);
+  const addLogComment = (id, text) => setLogs(logs.map(l => l.id === id ? { ...l, adminComment: text } : l));
+  
+  // Manajemen CRUD Admin
+  const addUserAdmin = (userData) => {
+    setUsers([...users, { id: Date.now(), role: 'user', status: 'active', ...userData }]);
+  };
+  const updateUserAdmin = (id, userData) => {
+    setUsers(users.map(u => u.id === id ? { ...u, ...userData } : u));
+  };
+  const deleteUserAdmin = (id) => {
+    setUsers(users.filter(u => u.id !== id));
+  };
+  
+  const toggleUserStatus = (id) => {
+    setUsers(users.map(u => u.id === id ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u));
+  };
+
+  // Render logic based on state
+  const renderScreen = () => {
+    if (currentScreen === 'login') return <LoginScreen onLogin={handleLogin} onNavigate={setCurrentScreen} />;
+    if (currentScreen === 'register') return <RegisterScreen onRegister={handleRegister} onNavigate={setCurrentScreen} />;
+    if (currentScreen === 'tutorial') return <TutorialScreen onBack={() => setCurrentScreen('app')} />;
+    if (currentScreen === 'cs') return <CustomerServiceScreen onBack={() => setCurrentScreen('app')} />;
+    
+    // Authenticated App Area
+    if (user?.role === 'user') {
+      return (
+        <>
+          {activeTab === 'home' && <HomeScreen user={user} setScreen={setCurrentScreen} />}
+          {activeTab === 'calendar' && <CalendarScreen />}
+          {activeTab === 'entry' && <EntryDataScreen entries={entries.filter(e => e.userId === user.id)} addEntry={addEntry} />}
+          {activeTab === 'monitor' && <MonitoringScreen monitoringLogs={logs.filter(l => l.userId === user.id)} addLog={addLog} />}
+          <BottomNav activeTab={activeTab} setTab={setActiveTab} role="user" />
+          
+          {/* Global Logout Button for Mock purposes (Floating) */}
+          <button onClick={handleLogout} className="absolute top-4 right-4 z-50 p-2 bg-white/20 backdrop-blur-md rounded-full text-white shadow-sm border border-white/30">
+            <LogOut size={18} />
+          </button>
+        </>
+      );
+    }
+
+    if (user?.role === 'admin') {
+      return (
+        <>
+          {activeTab === 'dashboard' && <AdminDashboard />}
+          {activeTab === 'reports' && <AdminReports logs={logs} addLogComment={addLogComment} />}
+          {activeTab === 'users' && (
+            <AdminUsers 
+              users={users} 
+              toggleUserStatus={toggleUserStatus} 
+              addUser={addUserAdmin}
+              updateUser={updateUserAdmin}
+              deleteUser={deleteUserAdmin}
+            />
+          )}
+          <AdminNav activeTab={activeTab} setTab={setActiveTab} />
+
+          <button onClick={handleLogout} className="absolute top-4 right-4 z-50 p-2 bg-slate-900/20 backdrop-blur-md rounded-full text-white shadow-sm border border-white/10">
+            <LogOut size={18} />
+          </button>
+        </>
+      );
+    }
+    
+    return null;
+  };
+
+  return (
+    <MobileFrame>
+      {renderScreen()}
+    </MobileFrame>
+  );
+}

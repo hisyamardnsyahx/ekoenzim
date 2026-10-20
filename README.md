@@ -1,4 +1,4 @@
-# Ekoenzim
+# E-KOMPAK
 
 Aplikasi Expo (SDK 54) untuk program pengolahan sampah / eko enzim warga.
 
@@ -70,7 +70,7 @@ pnpm start:clear
 
 ### Catatan Windows (path berisi spasi)
 
-Folder `D:\project pkm\ekoenzim` aman, tetapi **hindari spasi** di path bila masih bermasalah (pindah ke `D:\project\ekoenzim`).
+Folder `D:\project pkm\e-kompak` aman, tetapi **hindari spasi** di path bila masih bermasalah (pindah ke `D:\project\e-kompak`).
 
 ## Script
 

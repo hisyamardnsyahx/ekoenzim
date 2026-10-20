@@ -3,6 +3,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Feather from '@expo/vector-icons/Feather';
+import Svg, { Circle } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { AppImage } from '@/components/app-image';
@@ -20,12 +22,14 @@ import {
 import type { ProduksiBulanan } from '@/lib/domain';
 import type { ChatMessageDb, ProgramMeta } from '@/lib/supabase';
 
+const fraunces = { fontFamily: 'serif' };
+
 const DEFAULT_BANNER =
   'https://images.unsplash.com/photo-1595804369255-b77826a79854?auto=format&fit=crop&q=80&w=200';
 
 function fmt(n: number, unit: string) {
   const v = Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10);
-  return ${v} ;
+  return v + ' ' + unit;
 }
 
 export default function WargaDashboard() {
@@ -74,9 +78,7 @@ export default function WargaDashboard() {
   };
 
   const hasUnread = useMemo(() => {
-    if (chats.length === 0) return false;
-    const last = chats[chats.length - 1];
-    return last.sender_role === 'admin';
+    return chats.some((c) => c.sender_role === 'admin' && !c.is_read);
   }, [chats]);
 
   const cards = useMemo(
@@ -98,14 +100,6 @@ export default function WargaDashboard() {
         bg: 'bg-emerald-50',
       },
       {
-        id: '3',
-        title: 'Kompos',
-        value: summary ? fmt(summary.kompos, 'Kg') : '0 Kg',
-        icon: 'eco' as const,
-        color: Brand.slate,
-        bg: 'bg-slate-100',
-      },
-      {
         id: '4',
         title: 'Pakan',
         value: summary ? fmt(summary.pakan, 'Kg') : '0 Kg',
@@ -119,6 +113,10 @@ export default function WargaDashboard() {
 
   if (loading) return <LoadingState label="Memuat dashboard..." />;
 
+  const previousMonthRows = chartRows.slice(-5, -1);
+  const currentMonthRow = chartRows[chartRows.length - 1];
+  const compareEkoenzim = previousMonthRows.length > 0 && currentMonthRow && previousMonthRows[previousMonthRows.length-1].ekoEnzim ? ((currentMonthRow.ekoEnzim - previousMonthRows[previousMonthRows.length-1].ekoEnzim) / previousMonthRows[previousMonthRows.length-1].ekoEnzim * 100).toFixed(0) : 0;
+  
   return (
     <View className="flex-1 bg-surface">
       <SafeAreaView edges={['top']} className="bg-brand">
@@ -136,7 +134,7 @@ export default function WargaDashboard() {
               <MaterialIcons name="logout" size={18} color="#fff" />
             </Pressable>
             <View className="size-12 items-center justify-center rounded-full bg-white/20">
-              <MaterialIcons name="person" size={24} color="#fff" />
+              <Text className="text-xl font-bold text-emerald-100">{profile?.nama_lengkap ? profile.nama_lengkap.split(" ").map((n: string)=>n[0]).join("").substring(0, 2).toUpperCase() : "U"}</Text>
             </View>
           </View>
         </View>
@@ -151,29 +149,34 @@ export default function WargaDashboard() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* Banner program */}
-        <UiCard className="flex-row items-center gap-4 border-0 p-4 shadow-md">
-          <View className="size-16 overflow-hidden rounded-xl bg-gray-100">
-            <AppImage
-              uri={program?.banner_url || DEFAULT_BANNER}
-              width={64}
-              height={64}
-              borderRadius={12}
-              contentFit="cover"
-              accessibilityLabel="Banner program"
-            />
+        <View className="relative rounded-2xl overflow-hidden bg-primary p-5 shadow-md shadow-primary/20">
+          <View className="absolute inset-0 opacity-10">
+            <Svg viewBox="0 0 200 80" className="w-full h-full">
+              <Circle cx="170" cy="-10" r="70" fill="white" />
+              <Circle cx="10" cy="90" r="50" fill="white" />
+            </Svg>
           </View>
-          <View className="flex-1">
-            <Text className="font-bold leading-tight text-gray-800">
-              {program?.nama || 'Program E-KOMPAK'}
+          <View className="relative">
+            <Text className="text-primary-foreground/70 text-sm font-medium">Selamat datang kembali,</Text>
+            <Text className="text-2xl font-bold mt-0.5 text-primary-foreground" style={fraunces}>
+              {(profile?.nama_lengkap || 'Warga').split(" ")[0]}
             </Text>
-            <View className="mt-1 flex-row items-center gap-1">
-              <MaterialIcons name="place" size={12} color={Brand.muted} />
-              <Text className="text-xs font-medium text-gray-500">
-                {profile?.alamat || 'Lokasi Mitra'}
-              </Text>
+            <View className="mt-3 flex flex-row flex-wrap gap-x-4 gap-y-1">
+              <View className="flex flex-row items-center gap-1">
+                <Feather name="award" size={12} color="#ffffff" style={{ opacity: 0.8 }} />
+                <Text className="text-xs text-primary-foreground/80">{program?.nama || 'Program E-KOMPAK'}</Text>
+              </View>
+              <View className="flex flex-row items-center gap-1">
+                <Feather name="map-pin" size={12} color="#ffffff" style={{ opacity: 0.8 }} />
+                <Text className="text-xs text-primary-foreground/80">{profile?.alamat || 'Lokasi'}</Text>
+              </View>
+            </View>
+            <View className="mt-1 flex flex-row items-center gap-1">
+              <Feather name="users" size={12} color="#ffffff" style={{ opacity: 0.7 }} />
+              <Text className="text-xs text-primary-foreground/70">Mitra: {program?.mitra || 'Mitra'}</Text>
             </View>
           </View>
-        </UiCard>
+        </View>
 
         {/* Quick Actions */}
         <View className="flex-row gap-3">
@@ -203,7 +206,7 @@ export default function WargaDashboard() {
           <View className="flex-row flex-wrap gap-3">
             {cards.map((c) => (
               <UiCard key={c.id} className="min-w-[46%] flex-1 items-center border-0 p-3 shadow-sm">
-                <View className={mb-2 rounded-full p-2 }>
+                <View className={"mb-2 rounded-full p-2 " + c.bg}>
                   <MaterialIcons name={c.icon} size={18} color={c.color} />
                 </View>
                 <Text className="text-xl font-bold text-gray-800">{c.value}</Text>
@@ -216,13 +219,46 @@ export default function WargaDashboard() {
         </View>
 
         <UiCard className="border-0 p-5 shadow-sm">
-          <Text className="mb-4 text-sm font-semibold text-gray-800">Tren Pengolahan Sampah</Text>
+          <View className="flex-row items-center gap-2 mb-6">
+            <MaterialIcons name="assessment" size={20} color={Brand.greenDark} />
+            <Text className="text-sm font-bold text-gray-800">Produksi Bulanan</Text>
+          </View>
           {chartRows.length > 0 ? (
-            <SimpleBarChart
-              data={chartRows}
-              seriesKeys={['ekoEnzim', 'emberTumpuk', 'kompos', 'pakan']}
-              height={180}
-            />
+            <View>
+              <SimpleBarChart
+                data={chartRows.slice(-4)}
+                seriesKeys={['ekoEnzim', 'emberTumpuk', 'pakan']}
+                height={220}
+              />
+              <View className="flex-row items-center border-t border-gray-100 pt-6 mt-6 px-2">
+                <View className="items-center flex-1">
+                  <Text className="text-xl font-bold text-gray-900 mb-1">
+                    {chartRows[chartRows.length - 1]?.ekoEnzim?.toFixed(1) || '0.0'} L
+                  </Text>
+                  <Text className="text-xs text-gray-500">
+                    Ekoenzim ({chartRows[chartRows.length - 1]?.bulan || 'Bulan ini'})
+                  </Text>
+                </View>
+                <View className="w-px h-8 bg-gray-200" />
+                <View className="items-center flex-1">
+                  <Text className="text-xl font-bold text-gray-900 mb-1">
+                    {chartRows[chartRows.length - 1]?.emberTumpuk?.toFixed(1) || '0.0'} Kg
+                  </Text>
+                  <Text className="text-xs text-gray-500">
+                    Ember Tumpuk ({chartRows[chartRows.length - 1]?.bulan || 'Bulan ini'})
+                  </Text>
+                </View>
+                <View className="w-px h-8 bg-gray-200" />
+                <View className="items-center flex-1">
+                  <Text className="text-xl font-bold text-green-700 mb-1">
+                    {Number(compareEkoenzim) > 0 ? '+' : ''}{compareEkoenzim}%
+                  </Text>
+                  <Text className="text-xs text-gray-500">
+                    vs. {previousMonthRows[previousMonthRows.length-1]?.bulan || 'Bulan lalu'}
+                  </Text>
+                </View>
+              </View>
+            </View>
           ) : (
             <View className="h-44 items-center justify-center">
               <MaterialIcons name="bar-chart" size={40} color="#e5e7eb" />
@@ -232,7 +268,7 @@ export default function WargaDashboard() {
 
           <Pressable
             onPress={() => router.push('/grafik' as never)}
-            className="mt-3 items-center active:opacity-70">
+            className="mt-6 items-center active:opacity-70">
             <Text className="text-xs font-semibold text-brand">Lihat detail grafik →</Text>
           </Pressable>
         </UiCard>
