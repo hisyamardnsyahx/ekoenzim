@@ -84,6 +84,25 @@ Folder `D:\project pkm\e-kompak` aman, tetapi **hindari spasi** di path bila mas
 | `pnpm android` / `pnpm ios` / `pnpm web` | Buka platform terkait |
 | `pnpm lint` | ESLint |
 
+## Seeder data ibu ekompak (CSV)
+
+Mengisi database dari `ibu ekompak - Sheet1.csv` (239 baris harian, 27 Jul – 14 Sep 2026)
+sekaligus membuat 10 akun untuk tiap nama di CSV:
+
+```bash
+SSH_PASSWORD=xxx python3 run_seeder_ibu_ekompak.py
+python3 run_seeder_ibu_ekompak.py --dry-run   # lihat SQL tanpa menjalankan
+```
+
+- Akun: email `<username>@ibu.ekompak.local` (mis. `suparni@ibu.ekompak.local`),
+  password seragam `Ekompak123`. Ibu-ibu login dengan email + password tersebut.
+  Profil dibuat otomatis oleh trigger `handle_new_user`; akun yang sudah ada dilewati.
+- `entries`: tiap sel terisi (Pakan / Ekoenzim / Ember Tumpuk) → 1 baris
+  (`berat_awal` = `berat_penggunaan` = nilai, `berat_akhir` = 0).
+- `monitoring`: 1 baris per baris CSV, `volume_terolah` = total volume, status `Baik`.
+- Idempotent: `entries`/`monitoring`/`monitoring_comments` dihapus lalu diisi ulang
+  dalam satu transaksi; akun tidak dihapus.
+
 ## Struktur
 
 - `app/` — rute expo-router (tabs: Beranda, Kalender, Entry, Monitor)
