@@ -1,14 +1,14 @@
 /**
  * Supabase connection — override via EXPO_PUBLIC_* env when available.
- * Host: self-hosted stack on 103.253.213.250
+ * Host: self-hosted stack at https://ekoenzim.gamblingsweep.tech
  */
 export const SUPABASE_URL =
-  process.env.EXPO_PUBLIC_SUPABASE_URL ?? 'http://103.253.213.250:8000';
+  process.env.EXPO_PUBLIC_SUPABASE_URL ?? 'https://ekoenzim.gamblingsweep.tech';
 
-// Default keys from self-hosted Supabase demo JWT on 103.253.213.250
+// Default keys from self-hosted Supabase JWT at https://ekoenzim.gamblingsweep.tech
 export const SUPABASE_ANON_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkyNTY4MjcxLCJleHAiOjE5NTAyNDgyNzF9.b4tE2aObjgqh2dm7DCB4vW2Bisiufmc7_SDcwLfFt_s';
 
 export const SUPABASE_SERVICE_ROLE_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY ??

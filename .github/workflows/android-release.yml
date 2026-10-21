@@ -1,0 +1,176 @@
+name: Android APK Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (kosong = build-<run_number>)"
+        required: false
+        default: ""
+        type: string
+      prerelease:
+        description: "Tandai release sebagai prerelease"
+        required: false
+        default: true
+        type: boolean
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL || 'https://ekoenzim.gamblingsweep.tech' }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      NODE_ENV: production
+      EXPO_NO_GIT_STATUS: "1"
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && (inputs.tag || format('build-{0}', github.run_number)) || github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate required secrets
+        run: |
+          if [ -z "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::error::GitHub secret EXPO_PUBLIC_SUPABASE_ANON_KEY belum diisi."
+            exit 1
+          fi
+          if [ -z "$EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::GitHub secret EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY belum diisi."
+            exit 1
+          fi
+
+      - name: Write .env
+        run: |
+          {
+            echo "EXPO_PUBLIC_SUPABASE_URL=${EXPO_PUBLIC_SUPABASE_URL}"
+            echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${EXPO_PUBLIC_SUPABASE_ANON_KEY}"
+            echo "EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=${EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY}"
+          } > .env
+
+      - name: Set Android version code
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const file = 'app.json';
+          const config = JSON.parse(fs.readFileSync(file, 'utf8'));
+          config.expo.android.versionCode = Number(process.env.GITHUB_RUN_NUMBER);
+          fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n');
+          NODE
+
+      - name: Generate Android project
+        run: pnpm exec expo prebuild --platform android --clean --no-install
+
+      - name: Configure signing
+        id: signing
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+            cat >> android/app/build.gradle <<'GRADLE'
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("release.keystore")
+                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                      keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          GRADLE
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+          else
+            cp .github/keystores/debug.keystore android/app/debug.keystore
+            echo "mode=debug" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew :app:assembleRelease --no-daemon
+
+      - name: Collect APK
+        run: |
+          TAG_SAFE=$(echo "$RELEASE_TAG" | tr '/' '-')
+          mkdir -p release
+          cp android/app/build/outputs/apk/release/app-release.apk "release/ekoenzim-${TAG_SAFE}.apk"
+          (cd release && sha256sum "ekoenzim-${TAG_SAFE}.apk" > "ekoenzim-${TAG_SAFE}.apk.sha256")
+
+      - name: Verify APK signature
+        run: |
+          TAG_SAFE=$(echo "$RELEASE_TAG" | tr '/' '-')
+          SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          APKSIGNER=$(find "$SDK_ROOT/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::apksigner tidak ditemukan."
+            exit 1
+          fi
+          "$APKSIGNER" verify --print-certs "release/ekoenzim-${TAG_SAFE}.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ekoenzim-apk-${{ github.run_number }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: E-KOMPAK ${{ env.RELEASE_TAG }}
+          body: |
+            APK build otomatis oleh GitHub Actions.
+
+            - Commit: `${{ github.sha }}`
+            - Version code: `${{ github.run_number }}`
+            - Signing: `${{ steps.signing.outputs.mode }}`
+          files: |
+            release/*.apk
+            release/*.sha256
+          prerelease: ${{ inputs.prerelease || false }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
