@@ -81,12 +81,22 @@ export default function WargaDashboard() {
     return chats.some((c) => c.sender_role === 'admin' && !c.is_read);
   }, [chats]);
 
+  const currentSummaryHasData = summary
+    ? summary.ekoEnzim + summary.emberTumpuk + summary.kompos + summary.pakan > 0
+    : false;
+  const latestChartRow = chartRows[chartRows.length - 1] ?? null;
+  const displaySummary = currentSummaryHasData || !latestChartRow ? summary : latestChartRow;
+  const summaryTitle =
+    currentSummaryHasData || !latestChartRow
+      ? 'Ringkasan Bulan Ini'
+      : `Ringkasan Bulan Terakhir (${latestChartRow.bulan})`;
+
   const cards = useMemo(
     () => [
       {
         id: '1',
         title: 'Eko Enzim',
-        value: summary ? fmt(summary.ekoEnzim, 'L') : '0 L',
+        value: displaySummary ? fmt(displaySummary.ekoEnzim, 'L') : '0 L',
         icon: 'science' as const,
         color: Brand.blue.text,
         bg: 'bg-blue-50',
@@ -94,7 +104,7 @@ export default function WargaDashboard() {
       {
         id: '2',
         title: 'Ember Tumpuk',
-        value: summary ? fmt(summary.emberTumpuk, 'Kg') : '0 Kg',
+        value: displaySummary ? fmt(displaySummary.emberTumpuk, 'Kg') : '0 Kg',
         icon: 'compost' as const,
         color: Brand.green,
         bg: 'bg-emerald-50',
@@ -102,13 +112,13 @@ export default function WargaDashboard() {
       {
         id: '4',
         title: 'Pakan',
-        value: summary ? fmt(summary.pakan, 'Kg') : '0 Kg',
+        value: displaySummary ? fmt(displaySummary.pakan, 'Kg') : '0 Kg',
         icon: 'pets' as const,
         color: Brand.amber.text,
         bg: 'bg-amber-50',
       },
     ],
-    [summary],
+    [displaySummary],
   );
 
   if (loading) return <LoadingState label="Memuat dashboard..." />;
@@ -201,7 +211,7 @@ export default function WargaDashboard() {
         {/* Ringkasan & Grafik */}
         <View>
           <Text className="mb-3 px-1 text-sm font-semibold text-gray-800">
-            Ringkasan Bulan Ini
+            {summaryTitle}
           </Text>
           <View className="flex-row flex-wrap gap-3">
             {cards.map((c) => (

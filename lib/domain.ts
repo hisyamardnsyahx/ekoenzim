@@ -127,7 +127,7 @@ export function aggregateProduksiHarian(entries: EntriRow[], year: number, month
       row = { tanggal: dateKey, tanggalFormat: dateLabel, ekoEnzim: 0, emberTumpuk: 0, kompos: 0, pakan: 0 };
       map.set(dateKey, row);
     }
-    const kg = Number(e.beratAkhir) || 0;
+    const kg = Number(e.beratPenggunaan) || 0;
     const bucket = normalizePenggunaan(e.penggunaan);
     if (bucket === 'eko_enzim') row.ekoEnzim += kg;
     else if (bucket === 'ember_tumpuk') row.emberTumpuk += kg;
@@ -151,7 +151,7 @@ export function aggregateProduksiBulanan(entries: EntriRow[]): ProduksiBulanan[]
       row = { bulan: label, ekoEnzim: 0, emberTumpuk: 0, kompos: 0, pakan: 0 };
       map.set(key, row);
     }
-    const kg = Number(e.beratAkhir) || 0;
+    const kg = Number(e.beratPenggunaan) || 0;
     const bucket = normalizePenggunaan(e.penggunaan);
     if (bucket === 'eko_enzim') row.ekoEnzim += kg;
     else if (bucket === 'ember_tumpuk') row.emberTumpuk += kg;

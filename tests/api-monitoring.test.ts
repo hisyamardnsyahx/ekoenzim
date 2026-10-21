@@ -83,10 +83,26 @@ async function main() {
     const chart = aggregateProduksiBulanan(entries);
     assert.equal(chart.length, 1);
     assert.equal(chart[0].bulan, 'Jul');
-    assert.equal(chart[0].ekoEnzim, 6);
+    assert.equal(chart[0].ekoEnzim, 4);
     assert.equal(chart[0].kompos, 0);
     // Must not invent Feb–Jun mock series
     assert.equal(chart.some((r) => r.bulan === 'Feb'), false);
+  });
+
+  await test('aggregateProduksiBulanan uses beratPenggunaan when beratAkhir is zero (seeder rows)', () => {
+    const entries: EntriRow[] = [
+      {
+        id: 'seeder-1',
+        tanggal: '2026-07-27',
+        beratAwal: 0.7,
+        penggunaan: 'Eko enzim',
+        beratPenggunaan: 0.7,
+        beratAkhir: 0,
+      },
+    ];
+    const chart = aggregateProduksiBulanan(entries);
+    assert.equal(chart.length, 1);
+    assert.equal(chart[0].ekoEnzim, 0.7);
   });
 
   await test('uriToDataUrl passes through data: and https', async () => {

@@ -283,13 +283,16 @@ export default function GrafikScreen() {
   // Bulan aktif saat ini
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
   const currentMonthName = monthNames[new Date().getMonth()];
-  const activeMonthData = data.find((d) => d.bulan === currentMonthName) || {
-    bulan: currentMonthName,
-    ekoEnzim: 0,
-    emberTumpuk: 0,
-    kompos: 0,
-    pakan: 0,
-  };
+  const currentMonthData = data.find((d) => d.bulan === currentMonthName);
+  const activeMonthData = currentMonthData ??
+    data[data.length - 1] ?? {
+      bulan: currentMonthName,
+      ekoEnzim: 0,
+      emberTumpuk: 0,
+      kompos: 0,
+      pakan: 0,
+    };
+  const activeMonthLabel = currentMonthData || data.length === 0 ? 'Bulan Ini' : 'Bulan Terakhir';
 
   return (
     <View className="flex-1 bg-surface">
@@ -299,7 +302,7 @@ export default function GrafikScreen() {
         {/* Card Chart Bar Bulan Aktif Saat Ini */}
         <UiCard className="p-4 border-emerald-100 bg-white">
           <Text className="text-sm font-semibold text-gray-800 mb-4">
-            Produksi Bulan Ini ({activeMonthData.bulan})
+            Produksi {activeMonthLabel} ({activeMonthData.bulan})
           </Text>
           <SimpleBarChart
             data={[activeMonthData]}

@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import {
   aggregateProduksiBulanan,
+  aggregateProduksiHarian,
   captchaMatches,
   filterMonitoringByStatus,
   filterProduksiForChart,
@@ -124,11 +125,27 @@ test('aggregate produksi groups by usage', () => {
   const agg = aggregateProduksiBulanan(entries);
   assert.equal(agg.length, 1);
   assert.equal(agg[0].bulan, 'Jul');
-  assert.equal(agg[0].ekoEnzim, 6);
-  assert.equal(agg[0].kompos, 5);
-  assert.equal(agg[0].pakan, 4);
-  assert.equal(agg[0].emberTumpuk, 3.5);
+  assert.equal(agg[0].ekoEnzim, 4);
+  assert.equal(agg[0].kompos, 3);
+  assert.equal(agg[0].pakan, 2);
+  assert.equal(agg[0].emberTumpuk, 1.5);
   assert.equal(totalSampahTerolah(entries), 10.5);
+});
+
+test('aggregate produksi harian uses usage amount', () => {
+  const entries: EntriRow[] = [
+    {
+      id: '1',
+      tanggal: '2026-07-10',
+      beratAwal: 0.7,
+      penggunaan: 'Eko enzim',
+      beratPenggunaan: 0.7,
+      beratAkhir: 0,
+    },
+  ];
+  const rows = aggregateProduksiHarian(entries, 2026, 6);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].ekoEnzim, 0.7);
 });
 
 test('ringkasan bulan ini filters month', () => {
@@ -151,7 +168,7 @@ test('ringkasan bulan ini filters month', () => {
     },
   ];
   const r = ringkasanBulanIni(entries, new Date('2026-07-15'));
-  assert.equal(r.ekoEnzim, 3);
+  assert.equal(r.ekoEnzim, 2);
   assert.equal(r.kompos, 0);
 });
 
